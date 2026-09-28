@@ -29,7 +29,8 @@ test runner, so the package installs as a single tree.
 2. Every request carries that same key as `Authorization: Bearer <token>`. OpenResty
    authenticates it, then SeaFlow resolves the workflow project bound to it.
 3. The end user travels per request as `X-Infra-User-Id`. Set a default with
-   `endUserID`, or copy the client per request with `withEndUser`.
+   `endUserID`, or copy the client per request with `withEndUser`. It scopes
+   that user's private workspaces, draft workflows, assets, records, and runs.
 4. The Engine answers with the platform envelope `{"code":0,"message":"ok","data":...}`.
    The SDK resolves with `data` directly and turns a failure into a `WorkflowAPIError`.
 
@@ -88,7 +89,7 @@ console.log("run status:", detail.run.status);
 | `baseURL` | yes, unless `apiBaseURL` is set | Gateway or Engine root. The SDK derives `<baseURL>/api/v1`; use `https://seainfra.dev/flow` for OpenResty |
 | `apiBaseURL` | no | Explicit full API prefix, mainly for test servers or non-standard mounts |
 | `productionKey` | yes | The one Production Key bound to this caller. Every API request carries it as Bearer authentication |
-| `endUserID` | no | Default `X-Infra-User-Id`. The Engine stores it as an opaque identifier and never resolves it to an account |
+| `endUserID` | no | Default `X-Infra-User-Id`. It scopes private resources within the project; derive it from the integrating product's authenticated user |
 | `headers` | no | Extra headers on every request. `Authorization` is always replaced with `productionKey`; set `endUserID` rather than an `X-Infra-User-Id` header |
 | `timeoutMs` | no | Per-request timeout, 60 000 ms by default; `0` disables it |
 
@@ -110,12 +111,21 @@ value, so the body is exactly what the caller set.
 
 ## Ownership
 
-Ownership follows the Production Key's bound project, not the end user:
+The Production Key authenticates the integrating project. `endUserID` scopes a
+private owner inside that project, so workspaces, draft workflows, assets,
+records, and runs created through `withEndUser` are visible only to that same
+end user. The same external user ID in another project remains isolated.
 
-- `owner` is the bound project, so **workspaces, canvases, assets and
-  records are project-scoped** — every end user of that product shares them.
-- Runs are separated per end user: `workflows.listRuns` and `runs.get` only ever
-  answer with the caller's own runs.
+Published templates are a shared catalog: any caller may list, read, and copy
+them, while only their creator may publish a new version or take one offline.
+
+Omit `endUserID` only for a deliberately shared project workspace. A project
+credential still requires `endUserID` to start a run, because the Engine cannot
+invent the integrating product's user identity.
+
+Resources created without `endUserID` remain project-shared. SeaFlow cannot
+safely infer their historical end user, so move or export them under the
+integrating product's own policy before adopting `endUserID` for existing data.
 
 The catalog still carries the same key even though SeaFlow itself does not use it for
 catalog ownership: OpenResty requires it before forwarding `/flow` requests.
@@ -247,9 +257,10 @@ const user = client.withEndUser(currentUserID)
 ```
 
 - Construct one shared client per server configuration. `withEndUser` returns a
-  copy with a different `X-Infra-User-Id`; it does not change project ownership.
-- Workspaces, workflows, templates, assets, and records belong to the project
-  bound to the credential. End-user identity scopes run activity, not ownership.
+  copy with a different `X-Infra-User-Id`, which scopes that user's private
+  SeaFlow resources within the project.
+- Derive the end-user ID from the integrating product's authenticated user. Do
+  not send it as a model-selected argument or expose the Production Key to a browser.
 
 ## Workflow changes
 

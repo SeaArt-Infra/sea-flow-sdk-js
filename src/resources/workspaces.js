@@ -1,8 +1,8 @@
 import { asList, compact, listQuery, pathIdentifier, requireIdentifier } from "../util.js";
 
-// Workspaces group canvases, and belong to the caller identity: with a project
-// token that is the project, so every end user of the product shares them. An
-// end user separates runs, not canvases (ADR-0005, ADR-0010).
+// With endUserID, workspaces belong to that end user inside the project bound
+// to the Production Key. Omitting endUserID retains the project's shared
+// workspace (ADR-0005, ADR-0010).
 export class WorkspacesResource {
   constructor(transport) {
     this.transport = transport;

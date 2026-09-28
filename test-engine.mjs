@@ -128,15 +128,16 @@ test("the engine end to end", { skip }, async (t) => {
   assert.ok("dimensions" in saved.graph.nodes[0].data, "the canvas layout field did not survive the round trip");
   assert.equal(saved.graph.nodes[1].data.model, "nano_banana_2");
 
-  // 5. Publish it, which mints the immutable version a run executes (ADR-0007).
+  // 5. Draft workflows are private to the end user that created them.
+  await assert.rejects(otherUser.workflows.get(created.id), isNotFound);
+
+  // 5b. Publish it, which mints the immutable version a run executes (ADR-0007).
   const published = await client.workflows.publish(created.id);
   assert.notEqual(published.publishedVersionId, "");
   t.diagnostic(`published version ${published.publishedVersionId}`);
 
-  // 5b. Ownership follows the credential, not the end user: the canvas is
-  // project-scoped, so another end user of the same product sees it.
-  const fromAnotherEndUser = await otherUser.workflows.get(created.id);
-  assert.equal(fromAnotherEndUser.id, created.id);
+  // Published workflows are visible to callers on the same production line.
+  await otherUser.workflows.get(created.id);
 
   // 6. Reads that must agree with the writes.
   const workflows = await client.workflows.list({ limit: 100 });

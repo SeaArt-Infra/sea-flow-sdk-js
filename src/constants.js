@@ -1,5 +1,5 @@
 // The header the Engine reads the integrating product's end user from
-// (ADR-0010). Set from ClientOptions.endUserID.
+// (ADR-0010). It scopes private project resources and is set from ClientOptions.endUserID.
 export const END_USER_HEADER = "X-Infra-User-Id";
 
 // Node kinds a canvas node may carry in graph node data.kind.
