@@ -1,0 +1,23 @@
+{
+  "name": "sea-flow-sdk-js",
+  "version": "0.1.0",
+  "description": "Node.js SDK for the Workflow Engine (SeaFlow) project-facing API.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "docs",
+    "skills"
+  ],
+  "dependencies": {},
+  "engines": {
+    "node": ">=18.17"
+  }
+}
