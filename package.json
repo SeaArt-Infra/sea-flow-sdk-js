@@ -1,6 +1,6 @@
 {
   "name": "sea-flow-sdk-js",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Node.js SDK for the Workflow Engine (SeaFlow) project-facing API.",
   "type": "module",
   "main": "./src/index.js",
