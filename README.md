@@ -215,12 +215,58 @@ Engine's own tests. There is no browser-side mode: the credential stays on the s
 See [docs/usage-guide.md](docs/usage-guide.md) for the complete developer guide and
 [skills/sea-flow-sdk-js/SKILL.md](skills/sea-flow-sdk-js/SKILL.md) for the Agent skill.
 
-<script type="text/plain" data-doc-skill data-doc-skill-id="sea-flow-sdk-js" data-doc-skill-label="SeaFlow JavaScript SDK" data-doc-skill-filename="sea-flow-sdk-js-SKILL.md" data-doc-skill-version="1">
+<script type="text/plain" data-doc-skill data-doc-skill-id="sea-flow-sdk-js" data-doc-skill-label="Sea Flow SDK JS" data-doc-skill-filename="sea-flow-sdk-js-SKILL.md" data-doc-skill-version="1">
 ---
 name: sea-flow-sdk-js
-description: Build and troubleshoot SeaFlow integrations with the JavaScript SDK. Use when creating, publishing, copying, or running workflows, browsing templates and models, or diagnosing Production Key and end-user attribution errors.
+description: Implement or troubleshoot server-side SeaFlow workflow integrations with the JavaScript SDK. Use for template, workspace, workflow, run, model, asset, or record operations; do not use for browser clients.
 ---
-# SeaFlow JavaScript SDK
-Use `sea-flow-sdk-js` on Node.js 18.17+. Create one client with `baseURL` and `productionKey`, then use `withEndUser` for the current product user. Requests carry `Authorization: Bearer <productionKey>` and `X-Infra-User-Id`; never add `production_provider`.
-Route groups: `templateCatalog`, `templates`, `workspaces`, `workflows`, `runs`, `models`, `assets`, and `records`.
+
+# Sea Flow SDK JS
+
+Use `sea-flow-sdk-js` on Node.js 18.17+.
+
+## Scope
+
+- Use this SDK from server code only. Keep `productionKey` in the host
+  application's existing secret mechanism; do not expose it to a browser.
+- Use the SDK rather than duplicating its REST transport or adding a
+  `production_provider` request field.
+- Read `docs/usage-guide.md` before using a resource method not covered here.
+
+## Client and identity
+
+```js
+import { newClient } from "sea-flow-sdk-js"
+
+const client = newClient({
+  baseURL: process.env.SEA_FLOW_BASE_URL,
+  productionKey: process.env.SEA_FLOW_SDK_PRODUCTION_KEY,
+})
+
+const user = client.withEndUser(currentUserID)
+```
+
+- Construct one shared client per server configuration. `withEndUser` returns a
+  copy with a different `X-Infra-User-Id`; it does not change project ownership.
+- Workspaces, workflows, templates, assets, and records belong to the project
+  bound to the credential. End-user identity scopes run activity, not ownership.
+
+## Workflow changes
+
+- Standard write flow: create or copy a workspace workflow, `save` its complete
+  graph and name, `publish`, then `createRun`.
+- `workflows.save` replaces both name and graph. For a partial change, read the
+  workflow first and preserve the field that is not changing.
+- Treat graph objects as opaque JSON. Preserve canvas layout and unknown node
+  fields during read-modify-write operations.
+- `createRun` schedules asynchronous work. A concurrent active run can return a
+  conflict; do not retry it blindly.
+
+## Errors
+
+- `WorkflowConfigError` means local input/configuration failed before a request;
+  inspect its code, including `MISSING_BASE_URL`, `MISSING_PRODUCTION_KEY`, and
+  `MISSING_IDENTIFIER`.
+- `WorkflowAPIError` is an API envelope or HTTP failure. Use `isNotFound` and
+  `isConflict` for 404 and 409 handling; preserve other error details for callers.
 </script>

@@ -1,63 +1,53 @@
 ---
 name: sea-flow-sdk-js
-description: Build and troubleshoot SeaFlow integrations with the JavaScript SDK. Use when creating, publishing, copying, or running workflows, browsing templates and models, or diagnosing Production Key and end-user attribution errors.
+description: Implement or troubleshoot server-side SeaFlow workflow integrations with the JavaScript SDK. Use for template, workspace, workflow, run, model, asset, or record operations; do not use for browser clients.
 ---
 
-# SeaFlow JavaScript SDK
+# Sea Flow SDK JS
 
 Use `sea-flow-sdk-js` on Node.js 18.17+.
 
-## Install
+## Scope
 
-```bash
-npm install sea-flow-sdk-js
-```
+- Use this SDK from server code only. Keep `productionKey` in the host
+  application's existing secret mechanism; do not expose it to a browser.
+- Use the SDK rather than duplicating its REST transport or adding a
+  `production_provider` request field.
+- Read `docs/usage-guide.md` before using a resource method not covered here.
 
-## Workflow
-
-1. Create one `newClient` with the OpenResty root and onboarded Production Key.
-2. Call `withEndUser` for the current product user; it sets
-   `X-Infra-User-Id` without changing project ownership.
-3. Create or copy a workflow, save its graph, publish it, and create a run.
-4. Read or stop runs; use `templateCatalog` and `models` for discovery.
-5. Do not send `production_provider`; the server resolves it from the key's
-   onboarded project.
-
-## Initialize
+## Client and identity
 
 ```js
-import { newClient } from "sea-flow-sdk-js";
+import { newClient } from "sea-flow-sdk-js"
+
 const client = newClient({
-  baseURL: "https://seainfra.dev/flow",
+  baseURL: process.env.SEA_FLOW_BASE_URL,
   productionKey: process.env.SEA_FLOW_SDK_PRODUCTION_KEY,
-});
-const user = client.withEndUser("customer-42");
+})
+
+const user = client.withEndUser(currentUserID)
 ```
 
-Every request carries `Authorization: Bearer <productionKey>`. The key stays
-server-side; the SDK has no browser mode.
+- Construct one shared client per server configuration. `withEndUser` returns a
+  copy with a different `X-Infra-User-Id`; it does not change project ownership.
+- Workspaces, workflows, templates, assets, and records belong to the project
+  bound to the credential. End-user identity scopes run activity, not ownership.
 
-## Core call
+## Workflow changes
 
-```js
-const workspace = await user.workspaces.create({ name: "Demo" });
-const workflow = await user.workspaces.createWorkflow(workspace.id);
-await user.workflows.save(workflow.id, { name: "Demo", graph });
-await user.workflows.publish(workflow.id);
-const run = await user.workflows.createRun(workflow.id);
-const detail = await user.runs.get(run.id);
-```
+- Standard write flow: create or copy a workspace workflow, `save` its complete
+  graph and name, `publish`, then `createRun`.
+- `workflows.save` replaces both name and graph. For a partial change, read the
+  workflow first and preserve the field that is not changing.
+- Treat graph objects as opaque JSON. Preserve canvas layout and unknown node
+  fields during read-modify-write operations.
+- `createRun` schedules asynchronous work. A concurrent active run can return a
+  conflict; do not retry it blindly.
 
 ## Errors
 
-Catch `WorkflowAPIError`; use `isNotFound` and `isConflict`. Client mistakes
-raise `WorkflowConfigError` with codes such as `MISSING_BASE_URL`,
-`MISSING_PRODUCTION_KEY`, and `MISSING_IDENTIFIER`.
-
-## Route reference
-
-- `templateCatalog.search`, `readGraph`
-- `templates.list`, `publish`, `get`, `delete`, `copy`, `publishVersion`
-- `workspaces.list`, `create`, `get`, `rename`, `delete`, `listWorkflows`, `createWorkflow`
-- `workflows.list`, `create`, `get`, `save`, `delete`, `publish`, `pinCover`, `listRuns`, `createRun`
-- `runs.get`, `stop`; `models.list`; `assets.list`; `records.list`
+- `WorkflowConfigError` means local input/configuration failed before a request;
+  inspect its code, including `MISSING_BASE_URL`, `MISSING_PRODUCTION_KEY`, and
+  `MISSING_IDENTIFIER`.
+- `WorkflowAPIError` is an API envelope or HTTP failure. Use `isNotFound` and
+  `isConflict` for 404 and 409 handling; preserve other error details for callers.
