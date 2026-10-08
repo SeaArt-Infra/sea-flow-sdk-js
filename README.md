@@ -1,6 +1,6 @@
 # sea-flow-sdk-js
 
-> First release. The contract is maintained in SeaFlow at `docs/seaflow-openapi.yaml`.
+> First release. The contract is maintained in SeaFlow at `docs/seaflow-openapi.yaml`
 > in the Workflow Engine repository; the Engine never depends on this package.
 
 Node.js SDK for the Workflow Engine (SeaFlow). It wraps the project-facing API for
@@ -25,22 +25,29 @@ test runner, so the package installs as a single tree.
 
 ## How It Works
 
-1. Create a client with the OpenResty root URL and the caller's Production Key.
+1. Create a client with the OpenResty root URL and the caller's credential: the
+   integrating project's Production Key, or the personal key issued to one account.
 2. Every request carries that same key as `Authorization: Bearer <token>`. OpenResty
    authenticates it, then SeaFlow resolves the workflow project bound to it.
 3. The end user travels per request as `X-Infra-User-Id`. Set a default with
    `endUserID`, or copy the client per request with `withEndUser`. It scopes
    that user's private workspaces, draft workflows, assets, records, and runs.
+   A personal key already names its own end user, so leave this unset with one:
+   the Engine answers 403 when a personal key carries the header.
 4. The Engine answers with the platform envelope `{"code":0,"message":"ok","data":...}`.
    The SDK resolves with `data` directly and turns a failure into a `WorkflowAPIError`.
 
 ## Quick Start
 
 ```bash
-npm install sea-flow-sdk-js
+npm install github:SeaArt-Infra/sea-flow-sdk-js#v0.1.3
 ```
 
 Requires Node 18.17 or newer, where `fetch` and `AbortSignal.timeout` are available.
+
+The package is not on the public npm registry yet, so install it from the
+repository; `#v0.1.3` pins the released tag, and any other tag or commit works the
+same way. A local checkout installs with `npm install <path-to-checkout>`.
 
 ```js
 import { HANDLE, NODE_KIND, newClient } from "sea-flow-sdk-js";
@@ -88,7 +95,7 @@ console.log("run status:", detail.run.status);
 | --- | --- | --- |
 | `baseURL` | yes, unless `apiBaseURL` is set | Gateway or Engine root. The SDK derives `<baseURL>/api/v1`; use `https://seainfra.dev/flow` for OpenResty |
 | `apiBaseURL` | no | Explicit full API prefix, mainly for test servers or non-standard mounts |
-| `productionKey` | yes | The one Production Key bound to this caller. Every API request carries it as Bearer authentication |
+| `productionKey` | yes | The credential every API request carries as Bearer authentication: the project's Production Key, or a personal key issued to one account |
 | `endUserID` | no | Default `X-Infra-User-Id`. It scopes private resources within the project; derive it from the integrating product's authenticated user |
 | `headers` | no | Extra headers on every request. `Authorization` is always replaced with `productionKey`; set `endUserID` rather than an `X-Infra-User-Id` header |
 | `timeoutMs` | no | Per-request timeout, 60 000 ms by default; `0` disables it |
@@ -116,6 +123,15 @@ private owner inside that project, so workspaces, draft workflows, assets,
 records, and runs created through `withEndUser` are visible only to that same
 end user. The same external user ID in another project remains isolated.
 
+Two credentials reach this API, and they name the end user differently. A
+project Production Key acts for the integrating project and takes `endUserID`
+for each of its visitors. A personal key is minted for one account under one
+project line — create one on the platform's Account page, or let the `seaflow`
+CLI request one when it signs you in — so it already names its own end user:
+pass it in the same `productionKey` option and leave `endUserID` unset.
+The Engine answers 403 to a personal key that also carries `X-Infra-User-Id`,
+because a personal key must not be able to act as someone else.
+
 Published templates are a shared catalog: any caller may list, read, and copy
 them, while only their creator may publish a new version or take one offline.
 
@@ -129,6 +145,26 @@ integrating product's own policy before adopting `endUserID` for existing data.
 
 The catalog still carries the same key even though SeaFlow itself does not use it for
 catalog ownership: OpenResty requires it before forwarding `/flow` requests.
+
+## Team space
+
+Workspaces and workflows created with a bare project key — no `endUserID` — live
+in the project's shared space rather than under one person. `withScope` reads that
+space:
+
+```js
+import { SCOPE } from "sea-flow-sdk-js";
+
+const team = client.withScope(SCOPE.TEAM);
+const workspaces = await team.workspaces.list();
+const workflow = await team.workflows.get("wf-1");
+```
+
+The scope belongs to the client and applies to reads only: the Engine resolves
+reads against the shared owner and leaves writes in the caller's own space. It
+serves the shared space only to a credential that already belongs to that project
+— the project key itself, or a personal key whose parent production key is that
+project. Any other caller keeps their own space, so the scope cannot widen access.
 
 ## Errors
 
@@ -258,7 +294,15 @@ const user = client.withEndUser(currentUserID)
 
 - Construct one shared client per server configuration. `withEndUser` returns a
   copy with a different `X-Infra-User-Id`, which scopes that user's private
-  SeaFlow resources within the project.
+  workspaces, draft workflows, assets, records, and runs within the project.
+- Published templates are shared catalog entries. Any caller may read or copy
+  one, while only its creator may manage it.
+- A personal key already fixes its end user, so pass it in the same
+  `productionKey` option and leave `endUserID` unset: the Engine answers 403 to a
+  personal key that also carries `X-Infra-User-Id`. Create one on the platform's
+  Account page, or let the `seaflow` CLI request one when it signs you in.
+- Read the project's shared space with `withScope(SCOPE.TEAM)`: the scope applies
+  to reads only, and a write on that client still lands in the caller's own space.
 - Derive the end-user ID from the integrating product's authenticated user. Do
   not send it as a model-selected argument or expose the Production Key to a browser.
 

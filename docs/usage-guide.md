@@ -49,6 +49,23 @@ console.log(published.publishedVersionId, detail.run.status);
 `workflows.save` replaces both name and graph. Read the draft first when only
 one field changes. A graph with runtime inputs must pass them to `createRun`.
 
+## Team space
+
+A workspace or workflow created with a bare project key — no `endUserID` — lives
+in the project's shared space. `withScope` reads that space:
+
+```js
+import { SCOPE } from "sea-flow-sdk-js";
+
+const team = client.withScope(SCOPE.TEAM);
+const workspaces = await team.workspaces.list();
+```
+
+The scope belongs to the client and applies to reads only: the Engine resolves
+reads against the shared owner and leaves writes in the caller's own space. Only a
+credential that already belongs to the project reaches that space; for anyone else
+the scope still resolves to the caller's own space.
+
 ## Resources
 
 - `templateCatalog.search` and `readGraph` query the published catalog.
