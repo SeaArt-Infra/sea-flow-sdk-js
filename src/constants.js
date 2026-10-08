@@ -2,6 +2,13 @@
 // (ADR-0010). It scopes private project resources and is set from ClientOptions.endUserID.
 export const END_USER_HEADER = "X-Infra-User-Id";
 
+// The read scopes a client may ask for. SCOPE.TEAM reads the project's shared
+// space — the owner a bare project-key call records under. It is read-only: a
+// write always stays in the caller's own space.
+export const SCOPE = Object.freeze({
+  TEAM: "team",
+});
+
 // Node kinds a canvas node may carry in graph node data.kind.
 export const NODE_KIND = Object.freeze({
   INPUT_TEXT: "input-text",

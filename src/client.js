@@ -51,6 +51,24 @@ export class WorkflowClient {
     clone.records = new RecordsResource(clone.transport);
     return clone;
   }
+
+  // withScope returns a client whose reads resolve against another read scope.
+  // The receiver is unchanged, and the copy shares configuration — only the
+  // scope of a read differs. SCOPE.TEAM reads the project's shared space;
+  // writes are unaffected and always stay in the caller's own space.
+  withScope(scope) {
+    const clone = Object.create(WorkflowClient.prototype);
+    clone.transport = this.transport.withScope(scope);
+    clone.templateCatalog = new TemplateCatalogResource(clone.transport);
+    clone.templates = new TemplatesResource(clone.transport);
+    clone.workspaces = new WorkspacesResource(clone.transport);
+    clone.workflows = new WorkflowsResource(clone.transport);
+    clone.runs = new RunsResource(clone.transport);
+    clone.models = new ModelsResource(clone.transport);
+    clone.assets = new AssetsResource(clone.transport);
+    clone.records = new RecordsResource(clone.transport);
+    return clone;
+  }
 }
 
 export function newClient(options) {

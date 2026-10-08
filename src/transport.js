@@ -12,6 +12,7 @@ export class WorkflowTransport {
     this.apiBaseURL = resolveAPIBaseURL(this.baseURL, options.apiBaseURL);
     this.productionKey = String(options.productionKey ?? "").trim();
     this.endUserID = String(options.endUserID ?? "").trim();
+    this.scope = String(options.scope ?? "").trim();
     this.headers = { ...(options.headers ?? {}) };
     this.timeoutMs = normalizeTimeoutMs(options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   }
@@ -28,8 +29,32 @@ export class WorkflowTransport {
     });
   }
 
+  // withScope returns a transport whose reads resolve against another read
+  // scope. The receiver is unchanged. SCOPE.TEAM reads the project's shared
+  // space; the empty string reads the caller's own space.
+  withScope(scope) {
+    return new WorkflowTransport(this.baseURL, {
+      apiBaseURL: this.apiBaseURL,
+      productionKey: this.productionKey,
+      endUserID: this.endUserID,
+      scope,
+      headers: this.headers,
+      timeoutMs: this.timeoutMs,
+    });
+  }
+
   get(path, query) {
-    return this.request({ method: "GET", path, query });
+    return this.request({ method: "GET", path, query: this.scopedQuery(query) });
+  }
+
+  // The read scope travels on reads only. A write leaves it out of the request
+  // on purpose: the Engine ignores `scope` on a write, and not sending it keeps
+  // that visible on the wire.
+  scopedQuery(query) {
+    if (this.scope === "") {
+      return query;
+    }
+    return { ...(query ?? {}), scope: this.scope };
   }
 
   post(path, body) {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { WorkflowClient, END_USER_HEADER, isConflict, isNotFound, WorkflowAPIError, WorkflowConfigError } from "./src/index.js";
+import { WorkflowClient, END_USER_HEADER, SCOPE, isConflict, isNotFound, WorkflowAPIError, WorkflowConfigError } from "./src/index.js";
 import { captureServer, closeServer, envelope } from "./test-helpers.mjs";
 
 test("a credentialed call carries the token, the end user and the query", async (t) => {
@@ -43,6 +43,24 @@ test("withEndUser names one end user per request without touching the original",
     ["user-a", "user-b", "default-user"],
   );
   assert.equal(shared.transport.endUserID, "default-user");
+});
+
+test("withScope reads the shared team space without touching writes or the original", async (t) => {
+  const { server, requests, url } = await captureServer(envelope([]));
+  t.after(() => closeServer(server));
+
+  const client = new WorkflowClient({ baseURL: url, productionKey: "sdk-test-token" });
+  const team = client.withScope(SCOPE.TEAM);
+  await team.workspaces.list({ limit: 20 });
+  await team.workspaces.create({ name: "shared" });
+  await client.workspaces.list();
+
+  assert.deepEqual(
+    requests.map((request) => request.query),
+    ["limit=20&scope=team", "", ""],
+  );
+  assert.equal(team.transport.scope, SCOPE.TEAM);
+  assert.equal(client.transport.scope, "");
 });
 
 test("one client serves many end users concurrently without mixing them up", async (t) => {
